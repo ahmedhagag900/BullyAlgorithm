@@ -9,7 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\src\BullyAlgorithm\BullyAlgorithm.csproj" />
+    <ProjectReference Include="..\BullyAlgorithm\BullyAlgorithm.csproj" />
   </ItemGroup>
 
   <ItemGroup>
