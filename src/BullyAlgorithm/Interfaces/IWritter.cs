@@ -6,6 +6,9 @@ using System.Threading.Tasks;
 
 namespace BullyAlgorithm.Interfaces
 {
+    /// <summary>
+    /// used to write messages between process
+    /// </summary>
     public interface IMessageWritter
     {
         void Write(string data);

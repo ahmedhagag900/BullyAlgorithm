@@ -9,13 +9,14 @@ namespace BullyAlgorithm.Services
         private readonly ICommunicator _communicator;
         private readonly IMessageWritter _messageWritter;
 
-        //events used to allow processes to subscribe to the current process events
+        //events used to allow processes to subscribe to process events
         public event EventHandler<ElectionMessageArgs>? ElectionMessage;
         public event EventHandler<CoordinatorMessageArgs>? CoordinatorMessage;
 
         //set when message recieved election/corrdinator
         private bool _electionMessageRecieved;
         private bool _coordinatorHeartBeatRecieved;
+
         //cancel tokens used to terminate the listen and boadcast tasks used by corredinator and regular processes respectivly
         private CancellationTokenSource _coordinatorBoadcastCancelTokenSource;
         private CancellationTokenSource _regularProcessListenerCancelTokenSource;
@@ -54,9 +55,11 @@ namespace BullyAlgorithm.Services
                     _regularProcessListenerCancelTokenSource=new CancellationTokenSource();
                     _coordinatorBoadcastCancelTokenSource?.Cancel();
                 }
+                
                 //this process was corrdinator and another corrdinator has been selected
                 if(_isCorrdinator==true&&value==false)
                 {
+                    //the process runs as regular process
                     RegularProcessListen();
                 }
                 _isCorrdinator = value;
@@ -65,7 +68,8 @@ namespace BullyAlgorithm.Services
         public bool IsActive {get; set; }
 
 
-        public void Run(bool isRunning=false)
+        //run the process
+        public void Run()
         {
             IsActive = true;
             StartBullyElection();
@@ -98,7 +102,7 @@ namespace BullyAlgorithm.Services
                 if(p.ProcessId>this.ProcessId)
                 {
                    p.ElectionMessage += OnElectionMessageRecieved;
-                   p.SendElectionMessage();
+                   p.BeginElectionMessage();
                 }
             }
            
@@ -123,7 +127,7 @@ namespace BullyAlgorithm.Services
                 CoordinatorMessage?.Invoke(this, new CoordinatorMessageArgs { ProcessId = this.ProcessId });
             }
         }
-        public void SendElectionMessage()
+        public void BeginElectionMessage()
         {
             if (IsActive)
                 ElectionMessage?.Invoke(this, new ElectionMessageArgs { ProcessId = this.ProcessId });
