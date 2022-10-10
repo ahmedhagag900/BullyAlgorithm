@@ -15,9 +15,9 @@ namespace BullyTest
             IProcess p2 = new Process(2, communicator, messageWritter);
             IProcess p3 = new Process(3, communicator, messageWritter);
             p0.Run();
-            p3.Run();
             p1.Run();
             p2.Run();
+            p3.Run();
 
             //Thread.Sleep(5000);
             //p3.ShutDown();

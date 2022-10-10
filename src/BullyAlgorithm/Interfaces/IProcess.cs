@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace BullyAlgorithm.Interfaces
 {
-    public interface IProcess
+    public interface IProcess:IDisposable
     {
         int ProcessId { get; }  
         string ProcessName { get; } 
@@ -18,7 +18,7 @@ namespace BullyAlgorithm.Interfaces
 
         event EventHandler<ElectionMessageArgs> ElectionMessage;
 
-        event EventHandler<CoordinatorMessageArgs> CorrdinatorMessage;
+        event EventHandler<CoordinatorMessageArgs> CoordinatorMessage;
         
         void SendElectionMessage();
         void OnCoordinatorMessageRecieved(object sender, CoordinatorMessageArgs args);

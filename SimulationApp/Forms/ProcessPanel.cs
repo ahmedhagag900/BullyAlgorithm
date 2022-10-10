@@ -48,18 +48,27 @@ namespace SimulationApp.Forms
             Display.BorderStyle = BorderStyle.FixedSingle;
             Display.AutoSize=true;
             _process.Run();
+
+            Run.Click += OnRun;
+            ShutDown.Click += OnShutDown;
+            Run.Enabled = false;
         }
 
         private void OnShutDown(object sender,EventArgs args)
         {
             _process.ShutDown();
             Status.Text = "ShutDown";
+            Run.Enabled = true;
+            ShutDown.Enabled = false;
         }
 
         private void OnRun(object sender, EventArgs args)
         {
+
             _process.Run();
             Status.Text = "Running";
+            Run.Enabled = false;
+            ShutDown.Enabled = true;
         }
     }
 }

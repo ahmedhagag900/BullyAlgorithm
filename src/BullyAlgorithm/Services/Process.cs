@@ -9,9 +9,9 @@ namespace BullyAlgorithm.Services
         private readonly ICommunicator _communicator;
         private readonly IMessageWritter _messageWritter;
 
-        //events used to allow processes to subiscribe to the current process events
+        //events used to allow processes to subscribe to the current process events
         public event EventHandler<ElectionMessageArgs>? ElectionMessage;
-        public event EventHandler<CoordinatorMessageArgs>? CorrdinatorMessage;
+        public event EventHandler<CoordinatorMessageArgs>? CoordinatorMessage;
 
         //set when message recieved election/corrdinator
         private bool _electionMessageRecieved;
@@ -19,6 +19,7 @@ namespace BullyAlgorithm.Services
         //cancel tokens used to terminate the listen and boadcast tasks used by corredinator and regular processes respectivly
         private CancellationTokenSource _coordinatorBoadcastCancelTokenSource;
         private CancellationTokenSource _regularProcessListenerCancelTokenSource;
+
         private bool _isCorrdinator;
         public Process(int processId,ICommunicator communicator,IMessageWritter messageWritter,string processName=null)
         {
@@ -83,11 +84,13 @@ namespace BullyAlgorithm.Services
             this.IsActive = false;
             _coordinatorBoadcastCancelTokenSource?.Cancel();
             _regularProcessListenerCancelTokenSource?.Cancel();
+            ElectionMessage = null;
+            CoordinatorMessage = null;
         }
 
         private void StartBullyElection()
         {
-            _messageWritter.Write($"Process {this.ProcessId} Starts an Election....");
+            _messageWritter.Write($"[{DateTime.UtcNow}] Process {this.ProcessId} Starts an Election....");
 
             _electionMessageRecieved = false;
             foreach(var p in _communicator.GetProcesses)
@@ -104,7 +107,7 @@ namespace BullyAlgorithm.Services
             {
                 _communicator.GetProcesses.ToList().ForEach(p => p.IsCorrdinator = false);
                 IsCorrdinator = true;
-                _messageWritter.Write($"Process {this.ProcessId} is Coordinator");
+                _messageWritter.Write($"[{DateTime.UtcNow}] Process {this.ProcessId} is Coordinator");
             }
             
 
@@ -117,7 +120,7 @@ namespace BullyAlgorithm.Services
         {
             if (IsActive && IsCorrdinator)
             {
-                CorrdinatorMessage?.Invoke(this, new CoordinatorMessageArgs { ProcessId = this.ProcessId });
+                CoordinatorMessage?.Invoke(this, new CoordinatorMessageArgs { ProcessId = this.ProcessId });
             }
         }
         public void SendElectionMessage()
@@ -127,14 +130,19 @@ namespace BullyAlgorithm.Services
         }
         public void OnCoordinatorMessageRecieved(object sender,CoordinatorMessageArgs args)
         {
-            _coordinatorHeartBeatRecieved = true;
-            _messageWritter.Write($"[{DateTime.UtcNow} Process: {this.ProcessId}] (Corrdinator ({args.ProcessId}) is Alive)");
+            if (IsActive)
+            {
+                _coordinatorHeartBeatRecieved = true;
+                _messageWritter.Write($"[{DateTime.UtcNow} Process: {this.ProcessId}] (Corrdinator ({args.ProcessId}) is Alive)");
+            }
         }
         private void OnElectionMessageRecieved(object sender, ElectionMessageArgs args)
         {
-
-            _messageWritter.Write($"[{DateTime.UtcNow}] Process ({this.ProcessId}) recived election message from ({args.ProcessId})");
-            _electionMessageRecieved = true;
+            if (IsActive)
+            {
+                _messageWritter.Write($"[{DateTime.UtcNow}] Process ({this.ProcessId}) recived election message from ({args.ProcessId})");
+                _electionMessageRecieved = true;
+            }
         }
 
         #endregion
@@ -143,7 +151,7 @@ namespace BullyAlgorithm.Services
         {
             var boadCastTask = Task.Run(async () =>
             {
-                while (true)
+                while (!_coordinatorBoadcastCancelTokenSource.IsCancellationRequested)
                 {
                     SendCorrdinatorMessage();
                     await Task.Delay(1000);
@@ -156,17 +164,18 @@ namespace BullyAlgorithm.Services
             {
                 if (p.IsCorrdinator)
                 {
-                    p.CorrdinatorMessage += OnCoordinatorMessageRecieved;
+                    p.CoordinatorMessage += OnCoordinatorMessageRecieved;
                 }
             }
 
             var listener = Task.Run(async () =>
             {
-                while (true)
+
+                while (!_regularProcessListenerCancelTokenSource.IsCancellationRequested)
                 {
                     _coordinatorHeartBeatRecieved = false;
-                    await Task.Delay(3000);
-                    if (!_coordinatorHeartBeatRecieved)
+                    await Task.Delay(1100);
+                    if (!_coordinatorHeartBeatRecieved && IsActive)
                     {
                         Run();
                         break;
@@ -175,5 +184,10 @@ namespace BullyAlgorithm.Services
             }, _regularProcessListenerCancelTokenSource.Token);
         }
 
+        public void Dispose()
+        {
+            _coordinatorBoadcastCancelTokenSource?.Dispose();
+            _regularProcessListenerCancelTokenSource?.Dispose();
+        }
     }
 }
