@@ -7,4 +7,8 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\BullyAlgorithm\BullyAlgorithm.csproj" />
+  </ItemGroup>
+
 </Project>
