@@ -32,8 +32,8 @@ namespace SimulationApp.Forms
             ShutDown.Location = new Point(Run.Location.X + 100, Run.Location.Y);
             
             Run.Text = "Run Process";
-            ShutDown.Text = "ShutDown Process";
-            Status.Text = "Running Process";
+            ShutDown.Text = "Shutdown Process";
+            Status.Text = "Running";
 
             Name.Width = 150;
             Run.Width = 100;
@@ -57,7 +57,7 @@ namespace SimulationApp.Forms
         private void OnShutDown(object sender,EventArgs args)
         {
             _process.ShutDown();
-            Status.Text = "ShutDown";
+            Status.Text = "Shutdown";
             Run.Enabled = true;
             ShutDown.Enabled = false;
         }
