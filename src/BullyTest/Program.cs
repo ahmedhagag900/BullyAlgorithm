@@ -1,5 +1,8 @@
 ﻿using BullyAlgorithm.Interfaces;
 using BullyAlgorithm.Services;
+using System.Net.Sockets;
+using System.Net;
+using System.Text;
 
 namespace BullyTest
 {
@@ -7,17 +10,28 @@ namespace BullyTest
     {
         static void Main(string[] args)
         {
-            ICommunicator communicator = new Communicator();
-            IMessageWritter messageWritter = new ConsoleWriter();
+            //ICommunicator communicator = new Communicator();
+            //IMessageWritter messageWritter = new ConsoleWriter();
 
-            IProcess p0 = new Process(0, communicator, messageWritter);
-            IProcess p1 = new Process(1, communicator, messageWritter);
-            IProcess p2 = new Process(2, communicator, messageWritter);
-            IProcess p3 = new Process(3, communicator, messageWritter);
-            p0.Run();
+            //IProcess p0 = new Process(0, communicator, messageWritter);
+            //IProcess p1 = new Process(1, communicator, messageWritter);
+            //IProcess p2 = new Process(2, communicator, messageWritter);
+            //IProcess p3 = new Process(3, communicator, messageWritter);
+            //p0.Run();
+            //p1.Run();
+            //p2.Run();
+            //p3.Run();
+
+
+            var comm = new SocketCommunicator();
+            var wirter = new ConsoleWriter();
+
+            var p0=new SocketProcess(0,comm, wirter);
+            var p1=new SocketProcess(1,comm, wirter);
+
             p1.Run();
-            p2.Run();
-            p3.Run();
+            p0.Run();
+
 
             //Thread.Sleep(5000);
             //p3.ShutDown();

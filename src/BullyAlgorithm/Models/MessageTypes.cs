@@ -9,7 +9,8 @@ namespace BullyAlgorithm.Models
     public enum MessageTypes
     {
         Election=1,
-        None=2,
+        Coordinator=2,
+        Ok=3
     }
 
     public enum CoordinatorResponse
