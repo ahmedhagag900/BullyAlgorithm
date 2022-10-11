@@ -190,6 +190,7 @@ namespace BullyAlgorithm.Services
 
         public void Dispose()
         {
+            ShutDown();
             _coordinatorBoadcastCancelTokenSource?.Dispose();
             _regularProcessListenerCancelTokenSource?.Dispose();
         }

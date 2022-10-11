@@ -20,8 +20,7 @@ namespace BullyAlgorithm.Services
             {
                 foreach(var process in _map.Values)
                 {
-                    if(process.IsActive)
-                        yield return process;
+                    yield return process;
                 }
             }
         }
