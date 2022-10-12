@@ -14,10 +14,14 @@ namespace BullyAlgorithm.Services
     public class SocketCommunicator 
     {
         private Dictionary<int, SocketProcess> _map;
+        Dictionary<int, Socket> _clients;
+        private Socket _server;
+        private byte[] _buffer = new byte[1024];
         public SocketCommunicator()
         {
             _map = new Dictionary<int, SocketProcess>();
-            Task.Factory.StartNew(() => InitSocketServer());
+            _clients = new Dictionary<int, Socket>();
+            InitSocketServer();
         }
 
 
@@ -26,29 +30,54 @@ namespace BullyAlgorithm.Services
             IPHostEntry ipHostInfo = Dns.GetHostEntry(Dns.GetHostName());
             IPAddress ipAddress = ipHostInfo.AddressList[0];
             var _bindingAddress = new IPEndPoint(ipAddress, 1000);
-            var listener = new Socket(_bindingAddress.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-            listener.Bind(_bindingAddress);
-            listener.Listen(1);
-            while (true)
-            {
-                var handler = listener.Accept();
-                var buffer = new byte[1_024];
-                while (true)
-                {
-                    var received = handler.Receive(buffer, SocketFlags.None);
-                    var response = Encoding.UTF8.GetString(buffer, 0, received);
-                    var message = JsonConvert.DeserializeObject<Message>(response);
-                    if (message.MessageType == MessageTypes.Ok)
-                    {
-                        bool dd = true;
-                    }
-                    if (message?.To != null && message?.From != null)
-                    {
-                        _map[message.To].RecieveMessage(message.From, message.MessageType);
-                    }
-                }
-            }
+            _server = new Socket(_bindingAddress.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+            _server.Bind(_bindingAddress);
+            _server.Listen(1);
+            _server.ReceiveTimeout = 1000;
+            _server.BeginAccept(new AsyncCallback(AcceptCallBack), null);
             
+        }
+
+        private void AcceptCallBack(IAsyncResult Ar)
+        {
+            var socket = _server.EndAccept(Ar);
+            var buffer = new byte[300];
+            socket.BeginReceive(buffer, 0, buffer.Length, SocketFlags.None, new AsyncCallback(ReceiveCallBack), new { socket, buffer });
+            _server.BeginAccept(new AsyncCallback(AcceptCallBack), null);
+
+        }
+
+        private void ReceiveCallBack(IAsyncResult Ar)
+        {
+            dynamic state = Ar.AsyncState;
+            Socket socket = (Socket)state.socket;
+            var recieved= socket.EndReceive(Ar);
+            byte[] data = new byte[recieved];
+            Array.Copy((byte[])state.buffer,data,recieved);
+
+            string msgStr = Encoding.ASCII.GetString(data);
+            bool idMessage = int.TryParse(msgStr, out int spId);
+            if (idMessage)
+            {
+                if (!_clients.ContainsKey(spId))
+                    _clients.Add(spId, socket);
+
+                _clients[spId] = socket;
+                _clients[spId].Send(Encoding.ASCII.GetBytes("<ACK>"));
+            }else if(!string.IsNullOrEmpty(msgStr))
+            {
+                var message=JsonConvert.DeserializeObject<Message>(msgStr);
+                if (message?.From != null && message?.To != null)
+                {
+                    if (_clients.ContainsKey(message.From) && _clients.ContainsKey(message.To))
+                    {
+                        _clients[message.To].Send(data);
+                    }
+                }   
+            }
+            var buffer = new byte[300];
+            socket.BeginReceive(buffer, 0, buffer.Length, SocketFlags.None, new AsyncCallback(ReceiveCallBack), new { socket, buffer });
+
         }
 
         public IEnumerable<SocketProcess> GetProcesses
