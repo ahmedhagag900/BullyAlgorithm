@@ -4,63 +4,39 @@ using System.Net.Sockets;
 using System.Net;
 using System.Text;
 using System.Threading;
+using System.Diagnostics;
 
 namespace BullyTest
 {
     internal class Program
     {
+        private static CancellationTokenSource cts=new CancellationTokenSource();
         static void Main(string[] args)
         {
-            //ICommunicator communicator = new Communicator();
-            //IMessageWritter messageWritter = new ConsoleWriter();
+            var path= Environment.ProcessPath;
 
-            //IProcess p0 = new Process(0, communicator, messageWritter);
-            //IProcess p1 = new Process(1, communicator, messageWritter);
-            //IProcess p2 = new Process(2, communicator, messageWritter);
-            //IProcess p3 = new Process(3, communicator, messageWritter);
-            //p0.Run();
-            //p1.Run();
-            //p2.Run();
-            //p3.Run();
+            string processPath = path.Substring(0, path.IndexOf("src") + 3);
+            processPath += "\\ProcessConsole\\bin\\Debug\\net6.0\\ProcessConsole.exe";
 
+            AppDomain.CurrentDomain.ProcessExit += ShutDownServer;
+            ServerSocket sreverSocket = new ServerSocket(cts.Token);
 
-            var comm = new SocketCommunicator();
-            var wirter = new ConsoleWriter();
-
-            var p1 = new SocketProcess(1, comm, wirter);
-            var p2 = new SocketProcess(2, comm, wirter);
-            var p3 = new SocketProcess(3, comm, wirter);
-
-            p3.Run();
-
-            p2.Run();
-
-            p1.Run();
-            Thread.Sleep(5000);
-            p3.ShutDown();
-            //IPHostEntry ipHostInfo = Dns.GetHostEntry(Dns.GetHostName());
-            //IPAddress ipAddress = ipHostInfo.AddressList[0];
-            //var _connectAddress = new IPEndPoint(ipAddress, 1000);
-            //var _client = new Socket(_connectAddress.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-            //_client.Connect(_connectAddress);
-
-            //_client.Send(Encoding.ASCII.GetBytes("data to all"));
-
-            //Thread.Sleep(5000);
-            //p3.ShutDown();
-            //IProcess p0 = new Process(0, communicator, messageWritter);
-
-
-            //var rand = new Random();
-            //var prIds = Enumerable.Range(1, 3).OrderBy(x => rand.Next()).ToList();
-            //foreach (int id in prIds)
+            //for (int i = 0; i < 3; ++i)
             //{
-            //    SocketProcess p = new SocketProcess(id, comm, wirter);
-            //    p.Run();
+            //    ProcessStartInfo startInfo = new ProcessStartInfo();
+            //    startInfo.CreateNoWindow = false;
+            //    startInfo.UseShellExecute = false;
+            //    startInfo.FileName = processPath;
+            //    startInfo.WindowStyle = ProcessWindowStyle.Maximized;
+            //    System.Diagnostics.Process.Start(startInfo);
+            //    startInfo.Arguments = "\\K";
             //}
-
-
             Console.ReadLine();
+
+        }
+        private static void ShutDownServer(object Sender,EventArgs args)
+        {
+            cts.Cancel();
         }
     }
 }

@@ -10,12 +10,8 @@ namespace BullyAlgorithm.Models
     {
         Election=1,
         Coordinator=2,
-        Ok=3
-    }
-
-    public enum CoordinatorResponse
-    {
-        Fail=0,
-        Success=1
+        HeartBeat=3,
+        Ok=4,
+        Shutdown=5,
     }
 }
