@@ -166,7 +166,7 @@ namespace BullyAlgorithm.Services
              };
 
             //send election message to oher process
-            SendMessage(electionMessage, 200);
+            SendMessage(electionMessage, 1000);
 
             //if there is no ok response from sent election messages the current process elect it self as coordinator
             if (_receivedOkResponseFromElectionMessage == false)
