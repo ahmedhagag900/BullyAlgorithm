@@ -19,24 +19,23 @@ namespace BullyTest
             processPath += "\\ProcessConsole\\bin\\Debug\\net6.0\\ProcessConsole.exe";
 
             AppDomain.CurrentDomain.ProcessExit += ShutDownServer;
-            ServerSocket sreverSocket = new ServerSocket(cts.Token);
 
-            //for (int i = 0; i < 3; ++i)
-            //{
-            //    ProcessStartInfo startInfo = new ProcessStartInfo();
-            //    startInfo.CreateNoWindow = false;
-            //    startInfo.UseShellExecute = false;
-            //    startInfo.FileName = processPath;
-            //    startInfo.WindowStyle = ProcessWindowStyle.Maximized;
-            //    System.Diagnostics.Process.Start(startInfo);
-            //    startInfo.Arguments = "\\K";
-            //}
+
+            ServerSocket sreverSocket = new ServerSocket();
+
+            SyncProcess p0 = new SyncProcess(0, new ConsoleWriter());
+            SyncProcess p1 = new SyncProcess(1, new ConsoleWriter());
+
+            Task.Run(() => p1.Run());
+            p0.Run();
+
+
+
             Console.ReadLine();
 
         }
         private static void ShutDownServer(object Sender,EventArgs args)
         {
-            cts.Cancel();
         }
     }
 }

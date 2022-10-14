@@ -15,15 +15,15 @@ namespace BullyAlgorithm.Services
     {
 
         private Socket _server;
-        private ConcurrentBag<Socket> _cleints;
+        private List<Socket> _cleints;
         private List<int> dd = new List<int>(); 
-        public ServerSocket(CancellationToken ct)
+        public ServerSocket()
         {
 
-            _cleints = new ConcurrentBag<Socket>();
-            InitSocketServer(ct);
+            _cleints = new List<Socket>();
+            InitSocketServer();
         }
-        private async Task InitSocketServer(CancellationToken ct)
+        private void InitSocketServer()
         {
             IPHostEntry ipHostInfo = Dns.GetHostEntry(Dns.GetHostName());
             IPAddress ipAddress = ipHostInfo.AddressList[0];
@@ -32,33 +32,6 @@ namespace BullyAlgorithm.Services
             _server = new Socket(_bindingAddress.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
             _server.Bind(_bindingAddress);
             _server.Listen(1);
-            //try
-            //{
-
-            //    var handler = await _server.AcceptAsync();
-            //    _cleints.Add(handler);
-            //    while (!ct.IsCancellationRequested)
-            //    {
-            //        int x=handler.SendBufferSize;
-
-            //        byte[] buffer = new byte[300];
-            //        var recieved = await handler.ReceiveAsync(buffer, SocketFlags.None);
-
-            //        foreach(var socket in _cleints)
-            //        {
-            //            if(socket!=handler)
-            //            {
-            //                await socket.SendAsync(buffer, SocketFlags.None);
-            //            }
-            //        }
-
-            //    }
-            //}catch(Exception ex)
-            //{
-
-            //}
-            //_server.ReceiveTimeout = 5000;
-            //_server.SendTimeout = 5000;
             _server.BeginAccept(new AsyncCallback(AcceptCallBack), null);
 
         }
@@ -66,45 +39,11 @@ namespace BullyAlgorithm.Services
         private void AcceptCallBack(IAsyncResult Ar)
         {
             var socket = _server.EndAccept(Ar);
+            //message size 
             var buffer = new byte[33];
             _cleints.Add(socket);
-            try
-            {
-                while (true)
-                {
-                    string data = "";
-                    while (true)
-                    {
-                        int rec = socket.Receive(buffer, 0, buffer.Length, SocketFlags.None);
-                        data += Encoding.ASCII.GetString(buffer, 0, rec);
-                        if (data.LastIndexOf('}') == rec - 1)
-                            break;
-                    }
-                    if (!string.IsNullOrEmpty(data))
-                    {
-                        var messages = ReadAllBufferMessages(data);
-                        //send all messages
-                        foreach (var msg in messages)
-                        {
-                            foreach (var client in _cleints)
-                            {
-                                if (client != socket && client.Connected)
-                                {
-                                    var sendBuffer = Encoding.ASCII.GetBytes(msg);
-                                    client.Send(sendBuffer, sendBuffer.Length, SocketFlags.None);
-                                }
-                            }
-                        }
-                    }
-                    //socket.BeginReceive(buffer, 0, buffer.Length, SocketFlags.None, new AsyncCallback(ReceiveCallBack), new { socket, buffer });
-                    _server.BeginAccept(new AsyncCallback(AcceptCallBack), null);
-                }
-            }catch(SocketException ex)
-            {
-
-                //_server.BeginAccept(new AsyncCallback(AcceptCallBack), null);
-            }
-
+            socket.BeginReceive(buffer, 0, buffer.Length, SocketFlags.None, new AsyncCallback(ReceiveCallBack), new { socket, buffer });
+            _server.BeginAccept(new AsyncCallback(AcceptCallBack), null);
         }
 
         private void ReceiveCallBack(IAsyncResult Ar)
@@ -113,18 +52,19 @@ namespace BullyAlgorithm.Services
             Socket socket = (Socket)state.socket;
             var recieved = socket.EndReceive(Ar);
             byte[] data = new byte[recieved];
-            dd.Add(recieved);
+            
             Array.Copy((byte[])state.buffer, data, recieved);
 
             string msgStr = Encoding.ASCII.GetString(data);
-            //var message = JsonConvert.DeserializeObject<Message>(msgStr);
-            foreach(var client in _cleints)
+            dd.Add(recieved);
+
+            foreach (var client in _cleints)
             {
-                if(client!=socket)
-                    client.Send(data);
+                if (client != socket && client.Connected)
+                    client.Send(data, 0, data.Length, SocketFlags.None);
             }
 
-            var buffer = new byte[300];
+            var buffer = new byte[33];
             socket.BeginReceive(buffer, 0, buffer.Length, SocketFlags.None, new AsyncCallback(ReceiveCallBack), new { socket, buffer });
 
         }

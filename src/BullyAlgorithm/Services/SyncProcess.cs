@@ -47,16 +47,29 @@ namespace BullyAlgorithm.Services
             IPAddress ipAddress = ipHostInfo.AddressList[0];
             _connectEndpoint = new IPEndPoint(ipAddress, 1000);
             _client = new Socket(_connectEndpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-            //_client.ReceiveTimeout = 2000;
-            //_client.SendTimeout = 1000;
         }
 
+        private void RecieveCallBack(IAsyncResult Ar)
+        {
+            byte[] data = (byte[])Ar.AsyncState;
+            int rec=_client.EndReceive(Ar);
+
+            var messageString = Encoding.ASCII.GetString(data);
+            Message message=JsonConvert.DeserializeObject<Message>(messageString);
+            HandleRecievedMessages(message.From, message.MessageType);
+
+            var buffer = new byte[33];
+            _client.BeginReceive(buffer, 0, buffer.Length, SocketFlags.None, new AsyncCallback(RecieveCallBack), buffer);
+
+        }
 
 
 
         public void ShutDown()
         {
              IsActive = false;
+            _client.Shutdown(SocketShutdown.Both);
+            _client?.Close();
             _client?.Dispose();
         }
 
@@ -66,7 +79,7 @@ namespace BullyAlgorithm.Services
                 return;
 
             var mesg = $"[{DateTime.UtcNow} ({ProcessId})] ";
-            if (type == MessageTypes.Coordinator&&ProcessId<from)
+            if (type == MessageTypes.Coordinator && ProcessId<from)
             {
                 _messageWritter.Write($"{mesg} Process {from} is Coordinator");
                 IsCorrdinator = false;
@@ -85,14 +98,14 @@ namespace BullyAlgorithm.Services
                 _messageWritter.Write($"{mesg} Process {from} is Shuting down...");
             }else if(type==MessageTypes.Ok)
             {
-
+                _receivedOkResponseFromElectionMessage = true;
             }
             else if (type == MessageTypes.Election)
             {
 
-                _messageWritter.Write($"{mesg} Recieved Election Message from [{from}]");
                 if (ProcessId>from)
                 {
+                    _messageWritter.Write($"{mesg} Recieved Election Message from [{from}]");
                     var okMessage = new Message
                     {
                         From = ProcessId,
@@ -102,12 +115,16 @@ namespace BullyAlgorithm.Services
                     //send ok response to election message
                     SendMessage(okMessage);
                     StartBullyElection();
+                }else
+                {
+                    IsCorrdinator = false;
                 }
             }
         }
         public void Run()
         {
             IsActive = true;
+            ConnectClient();
             StartBullyElection();
             while (IsActive)
             {
@@ -119,13 +136,12 @@ namespace BullyAlgorithm.Services
                         From = ProcessId,
                         MessageType = MessageTypes.HeartBeat
                     };
-                    SendMessage(heartBeatMessage,2000);
-                    //Thread.Sleep(2000);
+                    SendMessage(heartBeatMessage);
+                    Thread.Sleep(1000);
                     //RecieveMessages();
                 }
-                
-                RecieveMessages();
-                //regular processw
+                _receivedHeartBeatResponseFromCoordinator = false;
+                Thread.Sleep(1200);
                 if (!_receivedHeartBeatResponseFromCoordinator)
                     StartBullyElection();
             }
@@ -166,7 +182,10 @@ namespace BullyAlgorithm.Services
              };
 
             //send election message to oher process
-            SendMessage(electionMessage, 1000);
+            SendMessage(electionMessage);
+
+            Thread.Sleep(1000);
+            //_client.ReceiveTimeout = 1000;
 
             //if there is no ok response from sent election messages the current process elect it self as coordinator
             if (_receivedOkResponseFromElectionMessage == false)
@@ -186,29 +205,13 @@ namespace BullyAlgorithm.Services
         {
             try
             {
-                ConnectClient();
+                //ConnectClient();
                 var serializedMessage = JsonConvert.SerializeObject(message);
-                _client.SendTimeout = sendTimeOut;
+                //_client.SendTimeout = sendTimeOut;
                 _client.Send(Encoding.ASCII.GetBytes(serializedMessage));
-                RecieveMessages(recieveTimeout);
-                _client.SendTimeout = 0;
-                //if (recieveResponse)
-                //{
-
-                //    _client.ReceiveTimeout= recieveTimeOut;
-                //    var data = new byte[33];
-                //    again:
-                //    var size = _client.Receive(data);
-                //    string msgStr = Encoding.ASCII.GetString(data);
-                //    var msg = JsonConvert.DeserializeObject<Message>(msgStr);
-                //    if (expectedRecieveType != null)
-                //    {
-                //        if (msg.MessageType != expectedRecieveType?.MessageType)
-                //            goto again;
-                //    }
-                //    _client.ReceiveTimeout = 0;
-                //    return msg;
-                //}
+                //RecieveMessages(recieveTimeout);
+                //_client.SendTimeout = 0;
+                
             }
             catch (SocketException ex)
             {
@@ -220,7 +223,10 @@ namespace BullyAlgorithm.Services
         {
             if (!_client.Connected)
             {
+                Thread.Sleep(1000);
                 _client.Connect(_connectEndpoint);
+                byte[] buffer = new byte[33];
+                _client.BeginReceive(buffer, 0, buffer.Length, SocketFlags.None, new AsyncCallback(RecieveCallBack), buffer);
             }
         }
 
