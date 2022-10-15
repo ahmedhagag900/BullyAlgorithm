@@ -21,7 +21,7 @@ namespace BullyAlgorithm.Services
         private bool _isActive;
         private const int _recieveTimeOut = 200;
         private const int _aliveMessageTimeOut = 1000;
-        private int _heartBeatCheckTimeOut = 1500;
+        private int _heartBeatCheckTimeOut = 1700;
         public ProcessCommunicator(int processId,IMessageWritter messageWritter)
         {
             //init process data 
@@ -88,12 +88,13 @@ namespace BullyAlgorithm.Services
         }
         public void ShutDown()
         {
+            
+            _isActive = false;
             foreach (var p in _clustrProcesses)
             {
                 Send(p, new CommunicatorMessage { From = _processId, Type = MessageTypes.Shutdown }, false, 100);
             }
 
-            _isActive = false;
             _clustrProcesses.Clear();
             _isCoordinator = false;
             _listener.Stop();
@@ -307,7 +308,7 @@ namespace BullyAlgorithm.Services
             if (message.Type == MessageTypes.Join)
             {
                 _clustrProcesses.Add(message.From);
-                _heartBeatCheckTimeOut *= _clustrProcesses.Count;
+                _heartBeatCheckTimeOut = _heartBeatCheckTimeOut* _clustrProcesses.Count;
                 _messageWritter.Write($"[{DateTime.UtcNow.ToString("MM/dd/yyyy hh:mm:ss.fff tt")} - [{_processId}] ] Processe ({message.From}) Joined the cluster");
             }
             else if (message.Type == MessageTypes.Coordinator)
@@ -340,6 +341,7 @@ namespace BullyAlgorithm.Services
             else if (message.Type == MessageTypes.Shutdown)
             {
                 _clustrProcesses.Remove(message.From);
+                _heartBeatCheckTimeOut = _heartBeatCheckTimeOut * _clustrProcesses.Count;
                 _messageWritter.Write($"[{DateTime.UtcNow.ToString("MM/dd/yyyy hh:mm:ss.fff tt")} - [{_processId}] ] Process ({message.From}) is Shuting down");
             }
         }

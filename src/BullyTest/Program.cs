@@ -37,9 +37,10 @@ namespace BullyTest
 
             Thread.Sleep(5000);
             p1.ShutDown();
-            //Thread.Sleep(15000);
-            //p1.Run();
-            //p3.ShutDown();
+            Thread.Sleep(15000);
+            Task.Run(() => p1.Run());
+            Thread.Sleep(1000);
+            p3.ShutDown();
 
             Console.ReadLine();
 
