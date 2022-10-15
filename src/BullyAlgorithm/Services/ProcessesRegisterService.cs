@@ -47,16 +47,15 @@ namespace BullyAlgorithm.Services
                 var recievedMessage = Encoding.ASCII.GetString(buffer, 0, recieved);
 
                 var message = recievedMessage.ToCommunicatorMessage();
-                if(!_processes.Contains(message.From))
+                
+                //inform other process in the cluster of the new joined process
+                foreach(var process in _processes)
                 {
-                    //inform other process in the cluster of the new joined process
-                    foreach(var process in _processes)
-                    {
-                        
-                        SendJoinMessage(message.From, process);
-                    }
-                    _processes.Add(message.From);
+                   SendJoinMessage(message.From, process);
                 }
+                if(!_processes.Contains(message.From))
+                    _processes.Add(message.From);
+                
 
                 //inform the joined process of other processes 
                 var processesMessage = string.Join('|', _processes.Where(p => p != message.From));
@@ -65,7 +64,6 @@ namespace BullyAlgorithm.Services
                 var sendBuffer = Encoding.ASCII.GetBytes(processesMessage);
 
                 sender.Send(sendBuffer);
-
                 sender.Close();
                 handler.Close();
             }

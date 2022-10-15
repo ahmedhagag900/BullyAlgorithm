@@ -27,9 +27,9 @@ namespace BullyTest
             var p2 = new ProcessCommunicator(2, new ConsoleWriter());
             var p3 = new ProcessCommunicator(3, new ConsoleWriter());
             Task.Run(() => p1.Run());
-            Thread.Sleep(500);
+            Thread.Sleep(1000);
             Task.Run(() => p2.Run());
-            Thread.Sleep(500);
+            Thread.Sleep(2000);
             Task.Run(() => p3.Run());
             
             Thread.Sleep(5000);
