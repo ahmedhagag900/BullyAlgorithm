@@ -1,198 +1,350 @@
-﻿using BullyAlgorithm.Interfaces;
+﻿using BullyAlgorithm.Helper;
+using BullyAlgorithm.Interfaces;
 using BullyAlgorithm.Models;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
+
 
 namespace BullyAlgorithm.Services
 {
-    public class Process : IProcess
+    public class Process:IProcess
     {
-        //used to group process together acts as a cluster of process 
-        private readonly ICommunicator _communicator;
+        private TcpListener _listener;
+        private readonly IPAddress _ip;
+        private readonly List<int> _clustrProcesses;
         private readonly IMessageWritter _messageWritter;
-
-        //events used to allow processes to subscribe to process events
-        public event EventHandler<ElectionMessageArgs>? ElectionMessage;
-        public event EventHandler<CoordinatorMessageArgs>? CoordinatorMessage;
-
-        //set when message recieved election/corrdinator
-        private bool _electionMessageRecieved;
-        private bool _coordinatorHeartBeatRecieved;
-
-        //cancel tokens used to terminate the listen and boadcast tasks used by corredinator and regular processes respectivly
-        private CancellationTokenSource _coordinatorBoadcastCancelTokenSource;
-        private CancellationTokenSource _regularProcessListenerCancelTokenSource;
-
-        private bool _isCorrdinator;
-        public Process(int processId,ICommunicator communicator,IMessageWritter messageWritter,string processName=null)
+        private readonly int _processId;
+        private const int _port = 1010;
+        private bool _isCoordinator;
+        private bool _heartBeatRecieved;
+        private bool _isActive;
+        private const int _recieveTimeOut = 200;
+        private const int _aliveMessageTimeOut = 1000;
+        private int _heartBeatCheckTimeOut = 1700;
+        public Process(int processId,IMessageWritter messageWritter)
         {
-            ProcessId = processId; ;
-            ProcessName = processName ?? Guid.NewGuid().ToString();
-            IsCorrdinator = false;
-            IsActive = false;
-            _communicator = communicator;
+            //init process data 
+            _isActive = false;
+            _processId = processId;
+            _clustrProcesses = new List<int>();
+            _isCoordinator = false;
             _messageWritter = messageWritter;
-            _communicator.AddProcess(this);
-            _electionMessageRecieved = false;
-            _coordinatorHeartBeatRecieved = false;
-            _coordinatorBoadcastCancelTokenSource = new CancellationTokenSource();
-            _regularProcessListenerCancelTokenSource = new CancellationTokenSource();
+            _heartBeatRecieved = false;
 
+            //inti process listener to messages
+            IPHostEntry host = Dns.GetHostEntry(Dns.GetHostName());
+            _ip = host.AddressList[0];
+            //InitListener();
         }
 
-
-        public int ProcessId { get; private set; }
-        public string ProcessName { get; private set; }
-        public bool IsCorrdinator 
-        { 
-            get { return _isCorrdinator; } set 
-            {
-                if (value == true)
-                {
-                    _coordinatorBoadcastCancelTokenSource = new CancellationTokenSource();
-                    _regularProcessListenerCancelTokenSource?.Cancel();
-                }
-                else
-                {
-                    _regularProcessListenerCancelTokenSource=new CancellationTokenSource();
-                    _coordinatorBoadcastCancelTokenSource?.Cancel();
-                }
-                
-                //this process was corrdinator and another corrdinator has been selected
-                if(_isCorrdinator==true&&value==false)
-                {
-                    //the process runs as regular process
-                    RegularProcessListen();
-                }
-                _isCorrdinator = value;
-            } 
+        private void InitListener()
+        {
+            _listener = new TcpListener(_ip, _port + _processId); 
+            _listener.Start();
         }
-        public bool IsActive {get; set; }
-
-
-        //run the process
         public void Run()
         {
-            IsActive = true;
-            StartBullyElection();
-            if (IsCorrdinator)
+            InitListener();
+            JoinToCluster();
+            _isActive = true;
+            if (_clustrProcesses.Count == 0)
             {
-                BoadCastCoordinatorMessage();
+                _isCoordinator = true;
+                _messageWritter.Write($"[{DateTime.UtcNow.ToString("MM/dd/yyyy hh:mm:ss.fff tt")} - [{_processId}] ] Process ({_processId}) won the election and became the coordinator :)");
             }
-            else
+            while (_isActive)
             {
-                RegularProcessListen();
+
+                
+                while (_isCoordinator&&_isActive)
+                {
+                    var heartBeatMessage = new CommunicatorMessage
+                    {
+                        From = _processId,
+                        Type = MessageTypes.HeartBeat
+                    };
+                    foreach(var process in _clustrProcesses)
+                    {
+                        Send(process, heartBeatMessage,false);
+                    }
+                    RecieveMessages(_recieveTimeOut);
+                    Thread.Sleep(_aliveMessageTimeOut);
+                }
+                if (_isActive)
+                {
+
+                    RecieveMessages(_heartBeatCheckTimeOut);
+                    if (!_heartBeatRecieved && _isActive)
+                    {
+                        _messageWritter.Write($"[{DateTime.UtcNow.ToString("MM/dd/yyyy hh:mm:ss.fff tt")} - [{_processId}] ] Coordinator failuer detected");
+                        StartBullyElection();
+                    }
+                    _heartBeatRecieved = false;
+                }
+
             }
 
         }
         public void ShutDown()
         {
-            this.IsActive = false;
-            _coordinatorBoadcastCancelTokenSource?.Cancel();
-            _regularProcessListenerCancelTokenSource?.Cancel();
-            ElectionMessage = null;
-            CoordinatorMessage = null;
-        }
+            
+            _isActive = false;
+            foreach (var p in _clustrProcesses)
+            {
+                Send(p, new CommunicatorMessage { From = _processId, Type = MessageTypes.Shutdown }, false, 100);
+            }
 
+            _clustrProcesses.Clear();
+            _isCoordinator = false;
+            _listener.Stop();
+
+        }
+        private void JoinToCluster()
+        {
+            var sender = CreateSenderSocket(_port);
+            if (sender == null)
+                return;
+            try
+            {
+                var messege = new CommunicatorMessage
+                {
+                    From = _processId,
+                    Type = MessageTypes.Join
+                };
+                byte[] buffer = messege.ToByte();
+                sender.Send(buffer, 0, buffer.Length, SocketFlags.None);
+
+
+                _messageWritter.Write($"[{DateTime.UtcNow.ToString("MM/dd/yyyy hh:mm:ss.fff tt")} - [{_processId}] ] Processe ({_processId}) is Joining the cluster...");
+                var handler = _listener.AcceptSocket();
+                var responseBuffer = new byte[50];
+                var recieved = handler.Receive(responseBuffer);
+                if (recieved > 0)
+                {
+                    string message = Encoding.ASCII.GetString(responseBuffer, 0, recieved);
+                    
+                    //if (message[0]=='{')
+                    //    continue;
+                    
+                    var processes = message.Split('|').Select(x => int.Parse(x)).ToList();
+                    _clustrProcesses.AddRange(processes);
+                    _heartBeatCheckTimeOut *= _clustrProcesses.Count;
+                    //break;
+                }
+                sender.Close();
+                handler.Close();
+                
+
+            }catch (SocketException sx)
+            {
+                sender.Close();
+            }catch(Exception ex) { }
+
+        }
         private void StartBullyElection()
         {
-            _messageWritter.Write($"[{DateTime.UtcNow}] Process {this.ProcessId} Starts an Election....");
-
-            _electionMessageRecieved = false;
-            foreach(var p in _communicator.GetProcesses)
+            _messageWritter.Write($"[{DateTime.UtcNow.ToString("MM/dd/yyyy hh:mm:ss.fff tt")} - [{_processId}] ] Process ({_processId}) is starting an election");
+            _isCoordinator = false;
+            var electionMessage = new CommunicatorMessage
             {
-                if(p.ProcessId>this.ProcessId)
+                From = _processId,
+                Type = MessageTypes.Election
+            };
+            bool recievedOk = false;
+            foreach(var process in _clustrProcesses)
+            {
+                if(process>_processId)
                 {
-                   p.ElectionMessage += OnElectionMessageRecieved;
-                   p.BeginElectionMessage();
-                }
-            }
-           
-            //if there is no response the current process is coordinator
-            if (_electionMessageRecieved == false)
-            {
-                _communicator.GetProcesses.ToList().ForEach(p => p.IsCorrdinator = false);
-                IsCorrdinator = true;
-                _messageWritter.Write($"[{DateTime.UtcNow}] Process {this.ProcessId} is Coordinator");
-            }
-            
-
-        }
-
-
-
-        #region send and recieve process messages pub / sub using events and event handler
-        private void SendCorrdinatorMessage()
-        {
-            if (IsActive && IsCorrdinator)
-            {
-                CoordinatorMessage?.Invoke(this, new CoordinatorMessageArgs { ProcessId = this.ProcessId });
-            }
-        }
-        public void BeginElectionMessage()
-        {
-            if (IsActive)
-                ElectionMessage?.Invoke(this, new ElectionMessageArgs { ProcessId = this.ProcessId });
-        }
-        public void OnCoordinatorMessageRecieved(object sender,CoordinatorMessageArgs args)
-        {
-            if (IsActive)
-            {
-                _coordinatorHeartBeatRecieved = true;
-                _messageWritter.Write($"[{DateTime.UtcNow} Process: {this.ProcessId}] (Corrdinator ({args.ProcessId}) is Alive)");
-            }
-        }
-        private void OnElectionMessageRecieved(object sender, ElectionMessageArgs args)
-        {
-            if (IsActive)
-            {
-                _messageWritter.Write($"[{DateTime.UtcNow}] Process ({this.ProcessId}) recived election message from ({args.ProcessId})");
-                _electionMessageRecieved = true;
-            }
-        }
-
-        #endregion
-
-        private void BoadCastCoordinatorMessage()
-        {
-            var boadCastTask = Task.Run(async () =>
-            {
-                while (!_coordinatorBoadcastCancelTokenSource.IsCancellationRequested)
-                {
-                    SendCorrdinatorMessage();
-                    await Task.Delay(1000);
-                }
-            }, _coordinatorBoadcastCancelTokenSource.Token);
-        }
-        private void RegularProcessListen()
-        {
-            foreach (var p in _communicator.GetProcesses)
-            {
-                if (p.IsCorrdinator)
-                {
-                    p.CoordinatorMessage += OnCoordinatorMessageRecieved;
-                }
-            }
-
-            var listener = Task.Run(async () =>
-            {
-
-                while (!_regularProcessListenerCancelTokenSource.IsCancellationRequested)
-                {
-                    _coordinatorHeartBeatRecieved = false;
-                    await Task.Delay(1100);
-                    if (!_coordinatorHeartBeatRecieved && IsActive)
+                    var response = Send(process, electionMessage,true);
+                    if(response?.Type==MessageTypes.Ok)
                     {
-                        Run();
+                        recievedOk = true;
                         break;
                     }
                 }
-            }, _regularProcessListenerCancelTokenSource.Token);
+            }
+
+            if(!recievedOk)
+            {
+                var coordinatorMessage = new CommunicatorMessage
+                {
+                    From = _processId,
+                    Type = MessageTypes.Coordinator
+                };
+                _isCoordinator = true;
+                _messageWritter.Write($"[{DateTime.UtcNow.ToString("MM/dd/yyyy hh:mm:ss.fff tt")} - [{_processId}] ] Process ({_processId}) Won the election and became the coordinator :)");
+                int sz = _clustrProcesses.Count;
+                for(int i=0;i<sz ;++i)
+                {
+                    Send(_clustrProcesses[i], coordinatorMessage, false);
+                }
+            }else
+            {
+                bool recievedCoordinatorMessage = Recieve(MessageTypes.Coordinator, _recieveTimeOut);
+                if (!recievedCoordinatorMessage)
+                    StartBullyElection();
+               
+            }
+
+        }
+        private Socket CreateSenderSocket(int port)
+        {
+            try
+            {
+                var sender = new Socket(_ip.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+                sender.Connect(_ip, port);
+                return sender;
+            }catch(Exception ex) 
+            { 
+                return null; 
+            }
+        }
+        private CommunicatorMessage Send(int toProcessId, CommunicatorMessage message, bool recieve = true, int timeOut = 0)
+        {
+            //send the message to the wanted process
+            var sender = CreateSenderSocket(_port + toProcessId);
+            if (sender == null)
+                return null;
+            try
+            {
+
+
+                var messageString = message.ToString();
+                byte[] buffer = Encoding.ASCII.GetBytes(messageString);
+                sender.SendTimeout = timeOut;
+                sender.Send(buffer, 0, buffer.Length, SocketFlags.None);
+
+                //expect to recieve message
+                if (recieve)
+                {
+                    //recieve respones of the sent message
+                    var handler = _listener.AcceptSocket();
+                    handler.ReceiveTimeout = timeOut;
+                    handler.Receive(buffer, 0, buffer.Length, SocketFlags.None);
+                    string recievedMessage = Encoding.ASCII.GetString(buffer);
+                    handler.Close();
+                    sender.Close();
+                    return recievedMessage.ToCommunicatorMessage();
+                }
+                sender.Close();
+                return null;
+
+            }
+            catch (SocketException sx)
+            {
+                sender.Close();
+                return null;
+            }
+            catch (Exception ex)
+            {
+                sender.Close();
+                return null;
+            }
+        }
+        private bool Recieve(MessageTypes type, int timeOut = 0)
+        {
+            try
+            {
+                var handler = _listener.AcceptSocket();
+                var buffer = new byte[33];
+                handler.ReceiveTimeout = timeOut;
+                try
+                {
+                    while (true)
+                    {
+                        handler.Receive(buffer, 0, buffer.Length, SocketFlags.None);
+                        var recievedMessage = Encoding.ASCII.GetString(buffer);
+                        var msg = recievedMessage.ToCommunicatorMessage();
+                        if (msg.Type == type)
+                        {
+                            handler.Close();
+                            return true;
+                        }
+                    }
+
+                }
+                catch (SocketException sx)
+                {
+                    handler.Close();
+                    return false;
+                }
+            }catch(Exception ex)
+            { return false; }
+        }
+        private void RecieveMessages(int timeOut)
+        {
+            if (!_isActive)
+                return;
+            if(!_listener.Pending())
+            {
+                Thread.Sleep(timeOut);
+            }
+
+            while(_isActive&&_listener.Pending())
+            {
+                var handler = _listener.AcceptSocket();
+                try
+                {
+                    byte[] buffer = new byte[50];
+                    handler.ReceiveTimeout = timeOut;
+                    int recieved = handler.Receive(buffer);
+                    var message = Encoding.ASCII.GetString(buffer, 0, recieved);
+                    HandleMessage(message.ToCommunicatorMessage());
+                    handler.Close();
+                    
+                }
+                catch (SocketException sx)
+                {
+                    handler.Close();
+                }
+                catch (Exception ex)
+                { }
+            }
+            return;
+        }
+        private void HandleMessage(CommunicatorMessage message)
+        {
+            if (message.Type == MessageTypes.Join)
+            {
+                _clustrProcesses.Add(message.From);
+                _heartBeatCheckTimeOut = _heartBeatCheckTimeOut* _clustrProcesses.Count;
+                _messageWritter.Write($"[{DateTime.UtcNow.ToString("MM/dd/yyyy hh:mm:ss.fff tt")} - [{_processId}] ] Processe ({message.From}) Joined the cluster");
+            }
+            else if (message.Type == MessageTypes.Coordinator)
+            {
+                _messageWritter.Write($"[{DateTime.UtcNow.ToString("MM/dd/yyyy hh:mm:ss.fff tt")} - [{_processId}] ] Process ({message.From}) is the coordinator ");
+                _isCoordinator = false;
+
+            }
+            else if (message.Type == MessageTypes.Election)
+            {
+
+                _messageWritter.Write($"[{DateTime.UtcNow.ToString("MM/dd/yyyy hh:mm:ss.fff tt")} - [{_processId}] ] Election Message received from Process ({message.From})");
+                var okMessage = new CommunicatorMessage
+                {
+                    From = _processId,
+                    Type = MessageTypes.Ok
+                };
+                var sender = CreateSenderSocket(_port + message.From);
+                if (sender != null)
+                {
+                    sender.Send(okMessage.ToByte());
+                    sender.Close();
+                }
+            }
+            else if (message.Type == MessageTypes.HeartBeat)
+            {
+                _heartBeatRecieved = true;
+                _messageWritter.Write($"[{DateTime.UtcNow.ToString("MM/dd/yyyy hh:mm:ss.fff tt")} - [{_processId}] ] HeartBeat received from Process ({message.From})");
+            }
+            else if (message.Type == MessageTypes.Shutdown)
+            {
+                _clustrProcesses.Remove(message.From);
+                _heartBeatCheckTimeOut = _heartBeatCheckTimeOut * _clustrProcesses.Count;
+                _messageWritter.Write($"[{DateTime.UtcNow.ToString("MM/dd/yyyy hh:mm:ss.fff tt")} - [{_processId}] ] Process ({message.From}) is Shuting down");
+            }
         }
 
-        public void Dispose()
-        {
-            ShutDown();
-            _coordinatorBoadcastCancelTokenSource?.Dispose();
-            _regularProcessListenerCancelTokenSource?.Dispose();
-        }
     }
 }

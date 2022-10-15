@@ -37,9 +37,6 @@ namespace SimulationApp.Forms
                 return;
             }
 
-            var simulationForm=new SimulationForm(numberOfProcess);
-
-            simulationForm.Show();
 
 
 

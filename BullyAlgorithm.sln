@@ -13,8 +13,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SimulationApp", "src\Simula
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ProcessConsole", "src\ProcessConsole\ProcessConsole.csproj", "{544EB0AF-A6F7-4B22-9569-F3808C93C5B6}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ClusterServer", "ClusterServer\ClusterServer.csproj", "{94E72FB4-00CB-4EB9-88E0-43F2CE9C83B9}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -37,10 +35,6 @@ Global
 		{544EB0AF-A6F7-4B22-9569-F3808C93C5B6}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{544EB0AF-A6F7-4B22-9569-F3808C93C5B6}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{544EB0AF-A6F7-4B22-9569-F3808C93C5B6}.Release|Any CPU.Build.0 = Release|Any CPU
-		{94E72FB4-00CB-4EB9-88E0-43F2CE9C83B9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{94E72FB4-00CB-4EB9-88E0-43F2CE9C83B9}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{94E72FB4-00CB-4EB9-88E0-43F2CE9C83B9}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{94E72FB4-00CB-4EB9-88E0-43F2CE9C83B9}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -50,7 +44,6 @@ Global
 		{6A77534D-8670-44C6-B3EB-190F272A823E} = {12873940-B1DA-46FF-A025-50F12B452849}
 		{8FCDD2D5-488B-4954-BCD9-779875D900E6} = {12873940-B1DA-46FF-A025-50F12B452849}
 		{544EB0AF-A6F7-4B22-9569-F3808C93C5B6} = {12873940-B1DA-46FF-A025-50F12B452849}
-		{94E72FB4-00CB-4EB9-88E0-43F2CE9C83B9} = {12873940-B1DA-46FF-A025-50F12B452849}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {2BA7BB23-07C6-4250-844D-D47AF80488E0}

@@ -1,4 +1,5 @@
 ﻿using BullyAlgorithm.Helper;
+using BullyAlgorithm.Interfaces;
 using BullyAlgorithm.Models;
 using System;
 using System.Collections.Generic;
@@ -10,7 +11,7 @@ using System.Threading.Tasks;
 
 namespace BullyAlgorithm.Services
 {
-    public class ProcessesRegisterService
+    public class ProcessesRegisterService:IProcessRegisterService
     {
         private readonly List<int> _processes;
         private Socket _server;

@@ -26,9 +26,9 @@ namespace BullyTest
             Task.Run(() => _registerServies.InitClusterServer());
 
             Thread.Sleep(1000);
-            var p1 = new ProcessCommunicator(1, new ConsoleWriter());
-            var p2 = new ProcessCommunicator(2, new ConsoleWriter());
-            var p3 = new ProcessCommunicator(3, new ConsoleWriter());
+            var p1 = new BullyAlgorithm.Services.Process(1, new ConsoleWriter());
+            var p2 = new BullyAlgorithm.Services.Process(2, new ConsoleWriter());
+            var p3 = new BullyAlgorithm.Services.Process(3, new ConsoleWriter());
             Task.Run(() => p1.Run());
             Thread.Sleep(1000);
             Task.Run(() => p2.Run());
