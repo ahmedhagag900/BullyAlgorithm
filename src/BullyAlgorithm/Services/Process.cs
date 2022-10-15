@@ -127,8 +127,8 @@ namespace BullyAlgorithm.Services
         /// </summary>
         private void JoinToCluster()
         {
-            var sender = CreateSenderSocket(_port);
-            if (sender == null)
+            var clusterSocket = CreateSenderSocket(_port);
+            if (clusterSocket == null)
                 return;
             try
             {
@@ -139,13 +139,13 @@ namespace BullyAlgorithm.Services
                     Type = MessageTypes.Join
                 };
                 byte[] buffer = messege.ToByte();
-                sender.Send(buffer, 0, buffer.Length, SocketFlags.None);
+                clusterSocket.Send(buffer, 0, buffer.Length, SocketFlags.None);
 
 
                 _messageWritter.Write($"[{DateTime.UtcNow.ToString("MM/dd/yyyy hh:mm:ss.fff tt")} - [{_processId}] ] Processe ({_processId}) is Joining the cluster...");
-                var handler = _listener.AcceptSocket();
+                
                 var responseBuffer = new byte[50];
-                var recieved = handler.Receive(responseBuffer);
+                var recieved = clusterSocket.Receive(responseBuffer);
                 //get the other processes and add them to processes list
                 if (recieved > 0)
                 {
@@ -154,13 +154,12 @@ namespace BullyAlgorithm.Services
                     _clustrProcesses.AddRange(processes);
                     
                 }
-                sender.Close();
-                handler.Close();
+                clusterSocket.Close();
                 
 
             }catch (SocketException sx)
             {
-                sender.Close();
+                clusterSocket.Close();
             }catch(Exception ex) { }
 
         }

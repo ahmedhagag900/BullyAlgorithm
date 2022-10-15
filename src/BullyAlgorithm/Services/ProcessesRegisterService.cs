@@ -49,10 +49,9 @@ namespace BullyAlgorithm.Services
 
                     //inform the joined process of other processes 
                     var processesMessage = string.Join('|', _processes.Where(p => p != message.From));
-                    var sender = CreateSenderSocket(_port + message.From);
 
                     var sendBuffer = Encoding.ASCII.GetBytes(processesMessage);
-                    sender.Send(sendBuffer);
+                    handler.Send(sendBuffer);
 
                     //inform other process in the cluster of the new joined process
                     foreach (var process in _processes)
@@ -64,8 +63,6 @@ namespace BullyAlgorithm.Services
                     if (!_processes.Contains(message.From))
                         _processes.Add(message.From);
 
-
-                    sender.Close();
                     handler.Close();
 
                 }
