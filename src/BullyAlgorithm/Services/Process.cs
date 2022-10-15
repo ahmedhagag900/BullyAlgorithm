@@ -308,7 +308,7 @@ namespace BullyAlgorithm.Services
             if (message.Type == MessageTypes.Join)
             {
                 _clustrProcesses.Add(message.From);
-                _heartBeatCheckTimeOut = _heartBeatCheckTimeOut* _clustrProcesses.Count;
+                //_heartBeatCheckTimeOut = _heartBeatCheckTimeOut* _clustrProcesses.Count;
                 _messageWritter.Write($"[{DateTime.UtcNow.ToString("MM/dd/yyyy hh:mm:ss.fff tt")} - [{_processId}] ] Processe ({message.From}) Joined the cluster");
             }
             else if (message.Type == MessageTypes.Coordinator)
@@ -341,7 +341,7 @@ namespace BullyAlgorithm.Services
             else if (message.Type == MessageTypes.Shutdown)
             {
                 _clustrProcesses.Remove(message.From);
-                _heartBeatCheckTimeOut = _heartBeatCheckTimeOut * _clustrProcesses.Count;
+                //_heartBeatCheckTimeOut = _heartBeatCheckTimeOut * _clustrProcesses.Count;
                 _messageWritter.Write($"[{DateTime.UtcNow.ToString("MM/dd/yyyy hh:mm:ss.fff tt")} - [{_processId}] ] Process ({message.From}) is Shuting down");
             }
         }

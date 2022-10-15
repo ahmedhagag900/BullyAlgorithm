@@ -65,7 +65,6 @@
             this.label1.Size = new System.Drawing.Size(235, 20);
             this.label1.TabIndex = 2;
             this.label1.Text = "Number of Processes to Simulate :";
-            this.label1.Click += new System.EventHandler(this.label1_Click);
             // 
             // label2
             // 
@@ -74,8 +73,7 @@
             this.label2.Name = "label2";
             this.label2.Size = new System.Drawing.Size(296, 20);
             this.label2.TabIndex = 3;
-            this.label2.Text = "Maximum numbers 7 due to demo purpose";
-            this.label2.Click += new System.EventHandler(this.label2_Click);
+            this.label2.Text = "Maximum numbers 5 due to demo purpose";
             // 
             // StartForm
             // 
@@ -89,6 +87,7 @@
             this.MaximizeBox = false;
             this.Name = "StartForm";
             this.Text = "StartForm";
+            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.StartForm_FormClosing);
             this.ResumeLayout(false);
             this.PerformLayout();
 
