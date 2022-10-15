@@ -13,17 +13,13 @@ namespace BullyTest
         private static CancellationTokenSource cts=new CancellationTokenSource();
         static void Main(string[] args)
         {
-            //var path= Environment.ProcessPath;
-
-            //string processPath = path.Substring(0, path.IndexOf("src") + 3);
-            //processPath += "\\ProcessConsole\\bin\\Debug\\net6.0\\ProcessConsole.exe";
-
-            //AppDomain.CurrentDomain.ProcessExit += ShutDownServer;
-
 
             ProcessesRegisterService _registerServies = new ProcessesRegisterService();
 
             Task.Run(() => _registerServies.InitClusterServer());
+
+            //should assing processes ids numbers greater than 0
+            //beacuse the process discovery port is the defaul and added the process id to it to make it the specific port of this process
 
             Thread.Sleep(1000);
             var p1 = new BullyAlgorithm.Services.Process(1, new ConsoleWriter());
@@ -44,9 +40,6 @@ namespace BullyTest
 
             Console.ReadLine();
 
-        }
-        private static void ShutDownServer(object Sender,EventArgs args)
-        {
         }
     }
 }

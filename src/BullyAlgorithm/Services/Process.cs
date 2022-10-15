@@ -22,6 +22,15 @@ namespace BullyAlgorithm.Services
         private const int _recieveTimeOut = 200;  
         private const int _aliveMessageTimeOut = 1000;
         private int _heartBeatCheckTimeOut = 3000;
+
+
+        /// <summary>
+        /// beacuse the process discovery port is the defaul and we add the process id to it
+        /// to make it the specific port of this process
+        /// </summary>
+        /// <param name="processId">should be greater than 0</param>
+        /// <param name="messageWritter"></param>
+
         public Process(int processId,IMessageWritter messageWritter)
         {
             //init process data 
