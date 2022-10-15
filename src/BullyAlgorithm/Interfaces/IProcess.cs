@@ -8,6 +8,9 @@ using System.Threading.Tasks;
 
 namespace BullyAlgorithm.Interfaces
 {
+    /// <summary>
+    /// the process to initate
+    /// </summary>
     public interface IProcess
     {
         public void Run();

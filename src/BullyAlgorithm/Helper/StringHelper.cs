@@ -10,6 +10,11 @@ namespace BullyAlgorithm.Helper
 {
     internal static class StringHelper
     {
+        /// <summary>
+        /// convert the string to message
+        /// </summary>
+        /// <param name="str"></param>
+        /// <returns></returns>
         public static CommunicatorMessage ToCommunicatorMessage(this string str)
         {
             try

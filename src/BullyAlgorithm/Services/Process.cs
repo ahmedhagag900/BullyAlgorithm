@@ -19,9 +19,9 @@ namespace BullyAlgorithm.Services
         private bool _isCoordinator;
         private bool _heartBeatRecieved;
         private bool _isActive;
-        private const int _recieveTimeOut = 200;
+        private const int _recieveTimeOut = 200;  
         private const int _aliveMessageTimeOut = 1000;
-        private int _heartBeatCheckTimeOut = 1700;
+        private int _heartBeatCheckTimeOut = 3000;
         public Process(int processId,IMessageWritter messageWritter)
         {
             //init process data 
@@ -43,11 +43,15 @@ namespace BullyAlgorithm.Services
             _listener = new TcpListener(_ip, _port + _processId); 
             _listener.Start();
         }
+        /// <summary>
+        /// run the process
+        /// </summary>
         public void Run()
         {
             InitListener();
             JoinToCluster();
             _isActive = true;
+            //if there is no other processes in the cluster the the current process is the coordinator
             if (_clustrProcesses.Count == 0)
             {
                 _isCoordinator = true;
@@ -55,10 +59,10 @@ namespace BullyAlgorithm.Services
             }
             while (_isActive)
             {
-
-                
+                //if the current process is coordinator
                 while (_isCoordinator&&_isActive)
                 {
+                    //send heart beat message [coordinator is alive] periodically 
                     var heartBeatMessage = new CommunicatorMessage
                     {
                         From = _processId,
@@ -68,13 +72,18 @@ namespace BullyAlgorithm.Services
                     {
                         Send(process, heartBeatMessage,false);
                     }
+                    //expect to recieve other messages like
+                    // join messages 
+                    // shutdown messages etc...
                     RecieveMessages(_recieveTimeOut);
                     Thread.Sleep(_aliveMessageTimeOut);
                 }
+                //if not coordinator
                 if (_isActive)
                 {
-
+                    //expect to recieve heart beat message for the defined time
                     RecieveMessages(_heartBeatCheckTimeOut);
+                    //if did not recieve heart beat message for the defined time then coordinator is down and start new election
                     if (!_heartBeatRecieved && _isActive)
                     {
                         _messageWritter.Write($"[{DateTime.UtcNow.ToString("MM/dd/yyyy hh:mm:ss.fff tt")} - [{_processId}] ] Coordinator failuer detected");
@@ -86,6 +95,9 @@ namespace BullyAlgorithm.Services
             }
 
         }
+        /// <summary>
+        /// shut down the process
+        /// </summary>
         public void ShutDown()
         {
             
@@ -100,6 +112,10 @@ namespace BullyAlgorithm.Services
             _listener.Stop();
 
         }
+        /// <summary>
+        /// join to the cluster and send join messages to other process in the cluster 
+        /// get the other processe in the cluster and save it in the processes list
+        /// </summary>
         private void JoinToCluster()
         {
             var sender = CreateSenderSocket(_port);
@@ -107,6 +123,7 @@ namespace BullyAlgorithm.Services
                 return;
             try
             {
+                //send join message to the process register 
                 var messege = new CommunicatorMessage
                 {
                     From = _processId,
@@ -120,17 +137,13 @@ namespace BullyAlgorithm.Services
                 var handler = _listener.AcceptSocket();
                 var responseBuffer = new byte[50];
                 var recieved = handler.Receive(responseBuffer);
+                //get the other processes and add them to processes list
                 if (recieved > 0)
                 {
                     string message = Encoding.ASCII.GetString(responseBuffer, 0, recieved);
-                    
-                    //if (message[0]=='{')
-                    //    continue;
-                    
                     var processes = message.Split('|').Select(x => int.Parse(x)).ToList();
                     _clustrProcesses.AddRange(processes);
-                    _heartBeatCheckTimeOut *= _clustrProcesses.Count;
-                    //break;
+                    
                 }
                 sender.Close();
                 handler.Close();
@@ -142,6 +155,10 @@ namespace BullyAlgorithm.Services
             }catch(Exception ex) { }
 
         }
+        
+        /// <summary>
+        /// starts the bully election algorithm
+        /// </summary>
         private void StartBullyElection()
         {
             _messageWritter.Write($"[{DateTime.UtcNow.ToString("MM/dd/yyyy hh:mm:ss.fff tt")} - [{_processId}] ] Process ({_processId}) is starting an election");
@@ -156,7 +173,9 @@ namespace BullyAlgorithm.Services
             {
                 if(process>_processId)
                 {
+                    //send election message to other processes with heigher id 
                     var response = Send(process, electionMessage,true);
+                    //if recieved an ok response then break
                     if(response?.Type==MessageTypes.Ok)
                     {
                         recievedOk = true;
@@ -165,6 +184,8 @@ namespace BullyAlgorithm.Services
                 }
             }
 
+            //if didn't recieve an ok response 
+            //pormote my self as coordinator
             if(!recievedOk)
             {
                 var coordinatorMessage = new CommunicatorMessage
@@ -175,19 +196,30 @@ namespace BullyAlgorithm.Services
                 _isCoordinator = true;
                 _messageWritter.Write($"[{DateTime.UtcNow.ToString("MM/dd/yyyy hh:mm:ss.fff tt")} - [{_processId}] ] Process ({_processId}) Won the election and became the coordinator :)");
                 int sz = _clustrProcesses.Count;
+                //sending coordinator message to other processes
                 for(int i=0;i<sz ;++i)
                 {
                     Send(_clustrProcesses[i], coordinatorMessage, false);
                 }
             }else
             {
+                //if recieved ok response wait for coordinator message to resieve
                 bool recievedCoordinatorMessage = Recieve(MessageTypes.Coordinator, _recieveTimeOut);
+                //if didn't recieve the coordinator message start the election again
                 if (!recievedCoordinatorMessage)
                     StartBullyElection();
                
             }
 
         }
+
+        /// <summary>
+        /// creates a socket to send to 
+        /// the socket created with the default ip address and the port is the  default port + processid
+        /// this desinged to distinguish between diffrent processes ports and which process to send to
+        /// </summary>
+        /// <param name="port"></param>
+        /// <returns></returns>
         private Socket CreateSenderSocket(int port)
         {
             try
@@ -200,6 +232,15 @@ namespace BullyAlgorithm.Services
                 return null; 
             }
         }
+
+        /// <summary>
+        /// send message to specific process
+        /// </summary>
+        /// <param name="toProcessId"></param>
+        /// <param name="message"></param>
+        /// <param name="recieve"></param>
+        /// <param name="timeOut"></param>
+        /// <returns></returns>
         private CommunicatorMessage Send(int toProcessId, CommunicatorMessage message, bool recieve = true, int timeOut = 0)
         {
             //send the message to the wanted process
@@ -242,6 +283,13 @@ namespace BullyAlgorithm.Services
                 return null;
             }
         }
+        
+        /// <summary>
+        /// recieve specific message type and returns true if recieved and false if not
+        /// </summary>
+        /// <param name="type"></param>
+        /// <param name="timeOut"></param>
+        /// <returns></returns>
         private bool Recieve(MessageTypes type, int timeOut = 0)
         {
             try
@@ -272,10 +320,16 @@ namespace BullyAlgorithm.Services
             }catch(Exception ex)
             { return false; }
         }
+       
+        /// <summary>
+        /// recieve different messages with the specified tim out
+        /// </summary>
+        /// <param name="timeOut"></param>
         private void RecieveMessages(int timeOut)
         {
             if (!_isActive)
                 return;
+            //if there is no pending connection wait for the timeout
             if(!_listener.Pending())
             {
                 Thread.Sleep(timeOut);
@@ -303,20 +357,27 @@ namespace BullyAlgorithm.Services
             }
             return;
         }
+
+        /// <summary>
+        /// handle different types of recieved messages
+        /// </summary>
+        /// <param name="message"></param>
         private void HandleMessage(CommunicatorMessage message)
         {
+            //if join message then add the join process to the list of processes discoverd
             if (message.Type == MessageTypes.Join)
             {
                 _clustrProcesses.Add(message.From);
-                //_heartBeatCheckTimeOut = _heartBeatCheckTimeOut* _clustrProcesses.Count;
                 _messageWritter.Write($"[{DateTime.UtcNow.ToString("MM/dd/yyyy hh:mm:ss.fff tt")} - [{_processId}] ] Processe ({message.From}) Joined the cluster");
             }
+            //if coordinator message 
             else if (message.Type == MessageTypes.Coordinator)
             {
                 _messageWritter.Write($"[{DateTime.UtcNow.ToString("MM/dd/yyyy hh:mm:ss.fff tt")} - [{_processId}] ] Process ({message.From}) is the coordinator ");
                 _isCoordinator = false;
 
             }
+            //if election message send ok response to the process and start the election
             else if (message.Type == MessageTypes.Election)
             {
 
@@ -333,15 +394,16 @@ namespace BullyAlgorithm.Services
                     sender.Close();
                 }
             }
+            //if heartbeat [coordinator is alive] then set the coordinator is alive flag with true  
             else if (message.Type == MessageTypes.HeartBeat)
             {
                 _heartBeatRecieved = true;
                 _messageWritter.Write($"[{DateTime.UtcNow.ToString("MM/dd/yyyy hh:mm:ss.fff tt")} - [{_processId}] ] HeartBeat received from Process ({message.From})");
             }
+            //if shutdown remove the process from discoverd processes
             else if (message.Type == MessageTypes.Shutdown)
             {
                 _clustrProcesses.Remove(message.From);
-                //_heartBeatCheckTimeOut = _heartBeatCheckTimeOut * _clustrProcesses.Count;
                 _messageWritter.Write($"[{DateTime.UtcNow.ToString("MM/dd/yyyy hh:mm:ss.fff tt")} - [{_processId}] ] Process ({message.From}) is Shuting down");
             }
         }
