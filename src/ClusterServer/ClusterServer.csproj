@@ -5,6 +5,7 @@
     <TargetFramework>net6.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <BaseOutputPath>bin\</BaseOutputPath>
   </PropertyGroup>
 
   <ItemGroup>
@@ -12,7 +13,7 @@
   </ItemGroup>
 
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-    <Exec Command="xcopy /y &quot;bin\Debug\net6.0\ProcessConsole.exe&quot;  &quot;..\SimulationApp\bin\Debug\net6.0-windows&quot;" />
+    <Exec Command="xcopy /y &quot;bin\Debug\net6.0\ClusterServer.exe&quot;  &quot;..\SimulationApp\bin\Debug\net6.0-windows&quot;" />
   </Target>
 
 </Project>

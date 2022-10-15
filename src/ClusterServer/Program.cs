@@ -6,8 +6,8 @@ namespace ClusterServer
     {
         static void Main(string[] args)
         {
-            var register = new ProcessesRegisterService();
-            register.InitClusterServer();
+            var regestirService = new ProcessesRegisterService();
+            regestirService.InitClusterServer();
         }
     }
 }
