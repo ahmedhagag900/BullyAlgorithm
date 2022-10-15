@@ -12,6 +12,7 @@ namespace BullyAlgorithm.Models
         Coordinator=2,
         HeartBeat=3,
         Ok=4,
-        Shutdown=5,
+        Join=5,
+        Shutdown=6,
     }
 }
