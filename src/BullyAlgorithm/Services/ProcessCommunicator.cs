@@ -10,7 +10,7 @@ namespace BullyAlgorithm.Services
 {
     public class ProcessCommunicator
     {
-        private readonly Socket _listener;
+        private TcpListener _listener;
         private readonly IPAddress _ip;
         private readonly List<int> _clustrProcesses;
         private readonly IMessageWritter _messageWritter;
@@ -19,9 +19,9 @@ namespace BullyAlgorithm.Services
         private bool _isCoordinator;
         private bool _heartBeatRecieved;
         private bool _isActive;
-        private const int _recieveTimeOut = 1000;
+        private const int _recieveTimeOut = 200;
         private const int _aliveMessageTimeOut = 1000;
-        private const int _heartBeatCheckTimeOut = 3000;
+        private int _heartBeatCheckTimeOut = 1500;
         public ProcessCommunicator(int processId,IMessageWritter messageWritter)
         {
             //init process data 
@@ -35,12 +35,17 @@ namespace BullyAlgorithm.Services
             //inti process listener to messages
             IPHostEntry host = Dns.GetHostEntry(Dns.GetHostName());
             _ip = host.AddressList[0];
-            _listener = new Socket(_ip.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-            _listener.Bind(new IPEndPoint(_ip, _port + _processId));
-            _listener.Listen();
+            //InitListener();
+        }
+
+        private void InitListener()
+        {
+            _listener = new TcpListener(_ip, _port + _processId); 
+            _listener.Start();
         }
         public void Run()
         {
+            InitListener();
             JoinToCluster();
             _isActive = true;
             if (_clustrProcesses.Count == 0)
@@ -50,8 +55,9 @@ namespace BullyAlgorithm.Services
             }
             while (_isActive)
             {
-                RecieveMessages(_recieveTimeOut);
-                while (_isCoordinator)
+
+                
+                while (_isCoordinator&&_isActive)
                 {
                     var heartBeatMessage = new CommunicatorMessage
                     {
@@ -62,18 +68,20 @@ namespace BullyAlgorithm.Services
                     {
                         Send(process, heartBeatMessage,false);
                     }
+                    RecieveMessages(_recieveTimeOut);
                     Thread.Sleep(_aliveMessageTimeOut);
                 }
-
-
-                //wait for heart beat to recieve
-                Thread.Sleep(_heartBeatCheckTimeOut);
-                if (!_heartBeatRecieved&&_isActive)
+                if (_isActive)
                 {
-                    _messageWritter.Write($"[{DateTime.UtcNow.ToString("MM/dd/yyyy hh:mm:ss.fff tt")} - [{_processId}] ] Coordinator failuer detected");
-                    StartBullyElection();
+
+                    RecieveMessages(_heartBeatCheckTimeOut);
+                    if (!_heartBeatRecieved && _isActive)
+                    {
+                        _messageWritter.Write($"[{DateTime.UtcNow.ToString("MM/dd/yyyy hh:mm:ss.fff tt")} - [{_processId}] ] Coordinator failuer detected");
+                        StartBullyElection();
+                    }
+                    _heartBeatRecieved = false;
                 }
-                _heartBeatRecieved = false;
 
             }
 
@@ -88,7 +96,7 @@ namespace BullyAlgorithm.Services
             _isActive = false;
             _clustrProcesses.Clear();
             _isCoordinator = false;
-            _listener.Close();
+            _listener.Stop();
 
         }
         private void JoinToCluster()
@@ -108,19 +116,24 @@ namespace BullyAlgorithm.Services
 
 
                 _messageWritter.Write($"[{DateTime.UtcNow.ToString("MM/dd/yyyy hh:mm:ss.fff tt")} - [{_processId}] ] Processe ({_processId}) is Joining the cluster...");
-
-                var handler = _listener.Accept();
+                var handler = _listener.AcceptSocket();
                 var responseBuffer = new byte[50];
-                var recieved=handler.Receive(responseBuffer);
+                var recieved = handler.Receive(responseBuffer);
                 if (recieved > 0)
                 {
                     string message = Encoding.ASCII.GetString(responseBuffer, 0, recieved);
+                    
+                    //if (message[0]=='{')
+                    //    continue;
+                    
                     var processes = message.Split('|').Select(x => int.Parse(x)).ToList();
                     _clustrProcesses.AddRange(processes);
+                    _heartBeatCheckTimeOut *= _clustrProcesses.Count;
+                    //break;
                 }
                 sender.Close();
                 handler.Close();
-
+                
 
             }catch (SocketException sx)
             {
@@ -205,7 +218,7 @@ namespace BullyAlgorithm.Services
                 if (recieve)
                 {
                     //recieve respones of the sent message
-                    var handler = _listener.Accept();
+                    var handler = _listener.AcceptSocket();
                     handler.ReceiveTimeout = timeOut;
                     handler.Receive(buffer, 0, buffer.Length, SocketFlags.None);
                     string recievedMessage = Encoding.ASCII.GetString(buffer);
@@ -232,7 +245,7 @@ namespace BullyAlgorithm.Services
         {
             try
             {
-                var handler = _listener.Accept();
+                var handler = _listener.AcceptSocket();
                 var buffer = new byte[33];
                 handler.ReceiveTimeout = timeOut;
                 try
@@ -260,54 +273,41 @@ namespace BullyAlgorithm.Services
         }
         private void RecieveMessages(int timeOut)
         {
-            try
-            {
-                var acceptResult = _listener.BeginAccept(new AsyncCallback(AcceptCallBack), timeOut);
-                acceptResult.AsyncWaitHandle.WaitOne(timeOut);
-            }
-            catch (SocketException sx)
-            {
-            }
-            catch (Exception ex)
-            {
-            }
-        }
-        private void AcceptCallBack(IAsyncResult Ar)
-        {
-            var timeOut = (int)Ar.AsyncState;
             if (!_isActive)
                 return;
-            var handler = _listener.EndAccept(Ar);
-            try
+            if(!_listener.Pending())
             {
-                byte[] buffer = new byte[50];
-                handler.ReceiveTimeout = timeOut;
-                while (true)
+                Thread.Sleep(timeOut);
+            }
+
+            while(_isActive&&_listener.Pending())
+            {
+                var handler = _listener.AcceptSocket();
+                try
                 {
+                    byte[] buffer = new byte[50];
+                    handler.ReceiveTimeout = timeOut;
                     int recieved = handler.Receive(buffer);
                     var message = Encoding.ASCII.GetString(buffer, 0, recieved);
                     HandleMessage(message.ToCommunicatorMessage());
                     handler.Close();
+                    
                 }
+                catch (SocketException sx)
+                {
+                    handler.Close();
+                }
+                catch (Exception ex)
+                { }
             }
-            catch (SocketException sx)
-            {
-                handler.Close();
-            }
-            catch (Exception ex)
-            { }
-            finally
-            {
-                var acceptResult = _listener.BeginAccept(new AsyncCallback(AcceptCallBack), timeOut);
-                acceptResult.AsyncWaitHandle.WaitOne(timeOut);
-            }
-
+            return;
         }
         private void HandleMessage(CommunicatorMessage message)
         {
             if (message.Type == MessageTypes.Join)
             {
                 _clustrProcesses.Add(message.From);
+                _heartBeatCheckTimeOut *= _clustrProcesses.Count;
                 _messageWritter.Write($"[{DateTime.UtcNow.ToString("MM/dd/yyyy hh:mm:ss.fff tt")} - [{_processId}] ] Processe ({message.From}) Joined the cluster");
             }
             else if (message.Type == MessageTypes.Coordinator)

@@ -23,6 +23,9 @@ namespace BullyTest
 
             ProcessesRegisterService _registerServies = new ProcessesRegisterService();
 
+            Task.Run(() => _registerServies.InitClusterServer());
+
+            Thread.Sleep(1000);
             var p1 = new ProcessCommunicator(1, new ConsoleWriter());
             var p2 = new ProcessCommunicator(2, new ConsoleWriter());
             var p3 = new ProcessCommunicator(3, new ConsoleWriter());
@@ -31,10 +34,11 @@ namespace BullyTest
             Task.Run(() => p2.Run());
             Thread.Sleep(2000);
             Task.Run(() => p3.Run());
-            
+
             Thread.Sleep(5000);
             p1.ShutDown();
-            Thread.Sleep(2000);
+            //Thread.Sleep(15000);
+            //p1.Run();
             //p3.ShutDown();
 
             Console.ReadLine();
