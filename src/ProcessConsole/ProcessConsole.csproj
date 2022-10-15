@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -12,7 +12,7 @@
   </ItemGroup>
 
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-    <Exec Command="xcopy /y &quot;bin\Debug\net6.0\ProcessConsole.exe&quot;  &quot;..\SimulationApp\bin\Debug\net6.0-windows&quot;" />
+    <Exec Command="xcopy /y &quot;bin\Debug\net6.0\ProcessConsole.exe&quot;  &quot;..\SimulationApp\bin\Debug\net6.0-windows&quot;&#xD;&#xA;xcopy /y &quot;bin\Debug\net6.0\ProcessConsole.dll&quot;  &quot;..\SimulationApp\bin\Debug\net6.0-windows&quot;&#xD;&#xA;xcopy /y &quot;bin\Debug\net6.0\ProcessConsole.runtimeconfig.json&quot; &quot;..\SimulationApp\bin\Debug\net6.0-windows&quot;" />
   </Target>
 
 </Project>

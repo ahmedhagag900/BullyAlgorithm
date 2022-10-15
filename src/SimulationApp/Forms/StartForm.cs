@@ -31,7 +31,7 @@ namespace SimulationApp.Forms
 
 
 
-
+            StartCluster();
 
 
 
@@ -41,7 +41,10 @@ namespace SimulationApp.Forms
         {
             using(Process cluster =new Process())
             {
-
+                cluster.StartInfo.FileName = "ClusterServer.exe";
+                cluster.StartInfo.UseShellExecute = true;
+                cluster.StartInfo.WindowStyle = ProcessWindowStyle.Maximized;
+                cluster.Start();
             }
         }
 
