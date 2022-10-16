@@ -203,11 +203,11 @@ namespace BullyAlgorithm.Services
                 };
                 _isCoordinator = true;
                 _messageWritter.Write($"[{DateTime.UtcNow.ToString("MM/dd/yyyy hh:mm:ss.fff tt")} - [{_processId}] ] Process ({_processId}) Won the election and became the coordinator :)");
-                int sz = _clustrProcesses.Count;
+                
                 //sending coordinator message to other processes
-                for(int i=0;i<sz ;++i)
+                foreach(var p in _clustrProcesses)
                 {
-                    Send(_clustrProcesses[i], coordinatorMessage, false);
+                    Send(p, coordinatorMessage, false);
                 }
             }else
             {
@@ -252,8 +252,8 @@ namespace BullyAlgorithm.Services
         private CommunicatorMessage Send(int toProcessId, CommunicatorMessage message, bool recieve = true, int timeOut = 0)
         {
             //send the message to the wanted process
-            var sender = CreateSenderSocket(_port + toProcessId);
-            if (sender == null)
+            var toSocket = CreateSenderSocket(_port + toProcessId);
+            if (toSocket == null)
                 return null;
             try
             {
@@ -261,33 +261,33 @@ namespace BullyAlgorithm.Services
 
                 var messageString = message.ToString();
                 byte[] buffer = Encoding.ASCII.GetBytes(messageString);
-                sender.SendTimeout = timeOut;
-                sender.Send(buffer, 0, buffer.Length, SocketFlags.None);
+                toSocket.SendTimeout = timeOut;
+                toSocket.Send(buffer, 0, buffer.Length, SocketFlags.None);
 
                 //expect to recieve message
                 if (recieve)
                 {
                     //recieve respones of the sent message
-                    var handler = _listener.AcceptSocket();
-                    handler.ReceiveTimeout = timeOut;
-                    handler.Receive(buffer, 0, buffer.Length, SocketFlags.None);
+                    //var handler = //_listener.AcceptSocket();
+                    toSocket.ReceiveTimeout = timeOut;
+                    toSocket.Receive(buffer, 0, buffer.Length, SocketFlags.None);
                     string recievedMessage = Encoding.ASCII.GetString(buffer);
-                    handler.Close();
-                    sender.Close();
+                    toSocket.Close();
+                   // toSocket.Close();
                     return recievedMessage.ToCommunicatorMessage();
                 }
-                sender.Close();
+                toSocket.Close();
                 return null;
 
             }
             catch (SocketException sx)
             {
-                sender.Close();
+                toSocket.Close();
                 return null;
             }
             catch (Exception ex)
             {
-                sender.Close();
+                toSocket.Close();
                 return null;
             }
         }

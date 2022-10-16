@@ -21,11 +21,11 @@ namespace SimulationApp.Forms
                 MessageBox.Show("Enter valid number");
                 return;
             }
-            if(numberOfProcess>5)
-            {
-                MessageBox.Show("Maximum number of process is 5 ");
-                return;
-            }
+            //if(numberOfProcess>5)
+            //{
+            //    MessageBox.Show("Maximum number of process is 5 ");
+            //    return;
+            //}
 
 
 

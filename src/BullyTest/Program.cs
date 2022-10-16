@@ -25,18 +25,25 @@ namespace BullyTest
             var p1 = new BullyAlgorithm.Services.Process(1, new ConsoleWriter());
             var p2 = new BullyAlgorithm.Services.Process(2, new ConsoleWriter());
             var p3 = new BullyAlgorithm.Services.Process(3, new ConsoleWriter());
+            var p4 = new BullyAlgorithm.Services.Process(4, new ConsoleWriter());
+            var p5 = new BullyAlgorithm.Services.Process(5, new ConsoleWriter());
+            var p6 = new BullyAlgorithm.Services.Process(6, new ConsoleWriter());
+            var p7 = new BullyAlgorithm.Services.Process(7, new ConsoleWriter());
             Task.Run(() => p3.Run());
             Thread.Sleep(1000);
             Task.Run(() => p1.Run());
             Thread.Sleep(2000);
             Task.Run(() => p2.Run());
-
+            Task.Run(() => p4.Run());
+            Task.Run(() => p6.Run());
+            Task.Run(() => p5.Run());
+            Task.Run(() => p7.Run());
             //Thread.Sleep(5000);
             //p1.ShutDown();
             //Thread.Sleep(15000);
             //Task.Run(() => p1.Run());
-            //Thread.Sleep(1000);
-            //p3.ShutDown();
+            Thread.Sleep(10000);
+            p3.ShutDown();
 
             Console.ReadLine();
 
